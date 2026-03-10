@@ -10,6 +10,7 @@
 *.userosscache
 *.sln.docstates
 *.env
+*.pfx
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -338,6 +339,13 @@ paket-files/
 
 # CodeRush personal settings
 **/.cr/personal
+
+# Security-sensitive local notes and history
+history.txt
+yubikey.txt
+yubikey-2.txt
+LXC_virtualization/notes.md
+LXC_virtualization/LXD_create_openclaw/notes.md
 
 # Python Tools for Visual Studio (PTVS)
 **/__pycache__/
