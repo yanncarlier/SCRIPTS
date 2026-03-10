@@ -60,11 +60,6 @@ openclaw config get gateway.auth.token
 cat ~/.openclaw/openclaw.json | grep -i token
 
 
-671d02e864caae53b871b3e513cc11bfce2c6ca67d1f810e2f1d3210e8f22af3
-
-
-72cc049fa8009541ebe478ed15e947baab4947d48979a5cb
-
 
 ss -tlnp | grep 18789
 
@@ -118,7 +113,7 @@ ssh openclaw@10.69.215.153
     },
     "auth": {
       "mode": "token",
-      "token": "671d02e864caae53b871b3e513cc11bfce2c6ca67d1f810e2f1d3210e8f22af3"
+      "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     },
     "tailscale": {
       "mode": "off",
