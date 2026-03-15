@@ -1,1 +1,0 @@
-# LXC_virtualization
