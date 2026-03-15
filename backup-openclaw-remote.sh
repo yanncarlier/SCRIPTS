@@ -31,11 +31,15 @@ ssh_exec() { ssh ${SSH_OPTS} "${REMOTE_USER}@${REMOTE_HOST}" "$@"; }
 scp_pull() { scp ${SSH_OPTS//-p/-P} "$@"; }   # scp uses -P (uppercase) for port
 
 # ─── MAIN ─────────────────────────────────────────────────────
+echo "==> [0/4] Retrieving remote hostname..."
+MACHINE_NAME=$(ssh_exec "hostname -s" | tr -d '[:space:]')
+echo "    Machine name: ${MACHINE_NAME}"
+
 echo "==> [1/4] Stopping OpenClaw gateway on ${REMOTE_HOST}..."
 ssh_exec "${REMOTE_HOME}/.npm-global/bin/openclaw gateway stop"
 
 echo "==> [2/4] Creating backup archive on remote..."
-BACKUP_FILENAME=$(ssh_exec "bash -c 'FNAME=\"${REMOTE_HOME}/openclaw-backup-\$(date +%Y%m%d-%H%M).tar.gz\"; tar -czf \"\$FNAME\" -C ${REMOTE_BACKUP_DIR} . && echo \"\$FNAME\"'")
+BACKUP_FILENAME=$(ssh_exec "bash -c 'FNAME=\"${REMOTE_HOME}/${MACHINE_NAME}-openclaw-backup-\$(date +%Y%m%d-%H%M).tar.gz\"; tar -czf \"\$FNAME\" -C ${REMOTE_BACKUP_DIR} . && echo \"\$FNAME\"'")
 echo "    Remote archive: ${BACKUP_FILENAME}"
 
 echo "==> [3/4] Restarting OpenClaw gateway..."
