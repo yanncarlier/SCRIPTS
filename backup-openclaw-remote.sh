@@ -6,8 +6,8 @@
 set -euo pipefail
 
 # ─── CONFIG ──────────────────────────────────────────────────
-REMOTE_USER="y"
-REMOTE_HOST="192.168.3.16"        # <-- set your remote host IP or hostname
+REMOTE_USER="user"                 # <-- set your remote username
+REMOTE_HOST="host.example.local"   # <-- set your remote host IP or hostname
 REMOTE_PORT="22"
 SSH_KEY=""                        # e.g. ~/.ssh/id_ed25519 — leave empty to use default
 BACKUP_DIR="./"                   # local destination folder
