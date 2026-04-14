@@ -7,8 +7,8 @@
 #  - GitHub CLI installed and authenticated: `gh auth login`
 #
 # Usage:
-#  OWNER="username" bash 1-gh-setup-dev-branches.sh
-#  OWNER="username" REPOS="repo1,repo2" bash 1-gh-setup-dev-branches.sh
+#  OWNER="username" bash 01-gh-setup-dev-branches.sh
+#  OWNER="username" REPOS="repo1,repo2" bash 01-gh-setup-dev-branches.sh
 #
 # Environment variables:
 #  - OWNER: GitHub user/org (default: "username")

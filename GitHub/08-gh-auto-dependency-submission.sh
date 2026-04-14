@@ -17,12 +17,12 @@ OWNER=${OWNER:-"username"}
 REPOS=${REPOS:-""}
 # Default snapshot file (script directory). Can be overridden via SNAPSHOT_FILE env var.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SNAPSHOT_FILE=${SNAPSHOT_FILE:-"$script_dir/8-test-snapshot.json"}
+SNAPSHOT_FILE=${SNAPSHOT_FILE:-"$script_dir/08-test-snapshot.json"}
 REPOS_TO_PROCESS=()
 
 if [ -z "$REPOS" ]; then
   echo "ERROR: No repositories specified."
-  echo "Usage: REPOS=\"repo1,repo2\" OWNER=\"username\" SNAPSHOT_FILE=\"/path/to/snapshot.json\" bash 8-gh-auto-dependency-submission.sh"
+  echo "Usage: REPOS=\"repo1,repo2\" OWNER=\"username\" SNAPSHOT_FILE=\"/path/to/snapshot.json\" bash 08-gh-auto-dependency-submission.sh"
   exit 1
 fi
 

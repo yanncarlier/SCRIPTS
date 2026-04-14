@@ -7,9 +7,9 @@
 #  - `gh` installed and authenticated with admin access to target repos.
 #
 # Usage examples:
-#  OWNER="username" bash 3-gh-setup-rulesets.sh
-#  REPOS="my-repo" OWNER="username" bash 3-gh-setup-rulesets.sh
-#  REPOS="repo1,repo2" OWNER="username" bash 3-gh-setup-rulesets.sh
+#  OWNER="username" bash 03-gh-setup-rulesets.sh
+#  REPOS="my-repo" OWNER="username" bash 03-gh-setup-rulesets.sh
+#  REPOS="repo1,repo2" OWNER="username" bash 03-gh-setup-rulesets.sh
 
 set -euo pipefail
 
