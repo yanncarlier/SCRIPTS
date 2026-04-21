@@ -25,7 +25,7 @@ This repository contains Bash scripts for automating GitHub repository security 
 6. `06-gh-enable-private-vuln-reporting.sh`
    - Turn on private vulnerability reporting.
 7. `09-gh-enable-dependabot-alerts.sh`
-   - Enable Dependabot vulnerability alerts.
+   - Enable Dependabot alerts (vulnerability + malware alerts coverage).
 8. `10-gh-enable-dependabot-security-updates.sh`
    - Enable Dependabot automated security updates.
 9. `03-gh-setup-rulesets.sh`
@@ -57,8 +57,9 @@ If `SNAPSHOT_FILE` is set, it will also run `08-gh-auto-dependency-submission.sh
 - `06-gh-enable-private-vuln-reporting.sh` — enable private vulnerability reporting
 - `07-gh-enable-dependency-graph.sh` — enable the dependency graph
 - `08-gh-auto-dependency-submission.sh` — submit dependency snapshots
-- `09-gh-enable-dependabot-alerts.sh` — enable Dependabot vulnerability alerts
+- `09-gh-enable-dependabot-alerts.sh` — enable Dependabot alerts (vulnerability + malware alerts coverage)
 - `10-gh-enable-dependabot-security-updates.sh` — enable Dependabot automated security fixes
+- `11-gh-enable-dependabot-malware-alerts.sh` — explicitly enable Dependabot malware alerts coverage (uses Dependabot alerts setting)
 - `20-gh-delete-rulesets.sh` — delete all repository rulesets (destructive)
 - `24-gh-disable-codeql.sh` — disable CodeQL default setup
 - `git_fetch_pull_all_subfolders.sh` — helper for git fetch/pull across nested folders
@@ -93,4 +94,3 @@ OWNER="my-org" REPOS="repo1,repo2" bash 02-gh-enable-push-protection.sh
 - Confirm `gh auth status` succeeds.
 - Verify the account has admin rights for the target repositories.
 - Re-run with corrected token scopes or repo access if a script fails.
-

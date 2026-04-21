@@ -39,7 +39,18 @@ run_script() {
   echo "Completed $script_name"
 }
 
-# Bootstrapping order
+# Recommended bootstrap order:
+# 1. create dev branch
+# 2. enable dependency graph
+# 3. submit dependency snapshot (optional)
+# 4. enable secret scanning
+# 5. enable push protection
+# 6. enable private vuln reporting
+# 7. enable Dependabot alerts (includes malware alerts coverage)
+# 8. enable Dependabot security updates
+# 9. apply branch protection rulesets
+# 10. configure Copilot Code Review rulesets
+
 run_script "01-gh-setup-dev-branches.sh"
 run_script "07-gh-enable-dependency-graph.sh"
 
