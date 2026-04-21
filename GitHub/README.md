@@ -64,6 +64,7 @@ If `SNAPSHOT_FILE` is set, it will also run `08-gh-auto-dependency-submission.sh
 - `11-gh-enable-dependabot-malware-alerts.sh` — explicitly enable Dependabot malware alerts coverage (uses Dependabot alerts setting)
 - `12-gh-enable-dependabot-grouped-security-updates.sh` — add grouped security update rules to existing `.github/dependabot.yml`
   - If `.github/dependabot.yml` is missing, it can auto-generate one from detected manifest/workflow files.
+- `13-gh-branch-hygiene-main.sh` — enable GitHub auto-delete for merged branches and optionally clean existing merged remote/local branches
 - `20-gh-delete-rulesets.sh` — delete all repository rulesets (destructive)
 - `24-gh-disable-codeql.sh` — disable CodeQL default setup
 - `git_fetch_pull_all_subfolders.sh` — helper for git fetch/pull across nested folders
