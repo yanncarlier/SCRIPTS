@@ -48,8 +48,10 @@ run_script() {
 # 6. enable private vuln reporting
 # 7. enable Dependabot alerts (includes malware alerts coverage)
 # 8. enable Dependabot security updates
-# 9. apply branch protection rulesets
-# 10. configure Copilot Code Review rulesets
+# 9. enable Dependabot malware alerts coverage (explicit script)
+# 10. enable grouped Dependabot security updates
+# 11. apply branch protection rulesets
+# 12. configure Copilot Code Review rulesets
 
 run_script "01-gh-setup-dev-branches.sh"
 run_script "07-gh-enable-dependency-graph.sh"
@@ -67,6 +69,8 @@ run_script "02-gh-enable-push-protection.sh"
 run_script "06-gh-enable-private-vuln-reporting.sh"
 run_script "09-gh-enable-dependabot-alerts.sh"
 run_script "10-gh-enable-dependabot-security-updates.sh"
+run_script "11-gh-enable-dependabot-malware-alerts.sh"
+run_script "12-gh-enable-dependabot-grouped-security-updates.sh"
 run_script "03-gh-setup-rulesets.sh"
 run_script "05-gh-copilot-code-review.sh"
 
