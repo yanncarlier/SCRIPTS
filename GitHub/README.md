@@ -28,9 +28,11 @@ This repository contains Bash scripts for automating GitHub repository security 
    - Enable Dependabot alerts (vulnerability + malware alerts coverage).
 8. `10-gh-enable-dependabot-security-updates.sh`
    - Enable Dependabot automated security updates.
-9. `03-gh-setup-rulesets.sh`
+9. `12-gh-enable-dependabot-grouped-security-updates.sh` (optional)
+   - Configure grouped Dependabot security updates via `.github/dependabot.yml`.
+10. `03-gh-setup-rulesets.sh`
    - Apply branch protection rulesets.
-10. `05-gh-copilot-code-review.sh`
+11. `05-gh-copilot-code-review.sh`
     - Configure Copilot Code Review rulesets after protections are in place.
 
 ---
@@ -60,6 +62,8 @@ If `SNAPSHOT_FILE` is set, it will also run `08-gh-auto-dependency-submission.sh
 - `09-gh-enable-dependabot-alerts.sh` — enable Dependabot alerts (vulnerability + malware alerts coverage)
 - `10-gh-enable-dependabot-security-updates.sh` — enable Dependabot automated security fixes
 - `11-gh-enable-dependabot-malware-alerts.sh` — explicitly enable Dependabot malware alerts coverage (uses Dependabot alerts setting)
+- `12-gh-enable-dependabot-grouped-security-updates.sh` — add grouped security update rules to existing `.github/dependabot.yml`
+  - If `.github/dependabot.yml` is missing, it can auto-generate one from detected manifest/workflow files.
 - `20-gh-delete-rulesets.sh` — delete all repository rulesets (destructive)
 - `24-gh-disable-codeql.sh` — disable CodeQL default setup
 - `git_fetch_pull_all_subfolders.sh` — helper for git fetch/pull across nested folders
