@@ -16,3 +16,8 @@ docker rmi -f $(docker images -q) || true
 
 # Prune system including volumes
 docker system prune -a --volumes -f || true
+
+
+# podman
+podman image prune
+podman system prune
