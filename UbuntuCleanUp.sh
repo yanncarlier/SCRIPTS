@@ -4,9 +4,18 @@
 # Usage: bash UbuntuCleanUp.sh
 #
 
+# All directories (hidden + normal) — most useful
+du -sh .[^.]* * | sort -h
+# Quick one-liner (very popular)
+du -ahd1 | sort -h
+
+
 df -h / /var /home   # Human-readable free space
 du -sh /var/lib/snapd   # Snap usage
 snap list --all   # See revisions taking space
+
+# apt
+sudo apt update -y && sudo apt upgrade -y && sudo apt autoremove -y && sudo apt clean
 
 # sudo snap remove --purge <old-snap>   # e.g., deepseek-r1 if still there
 sudo snap set system refresh.retain=2   # Limit old revisions
@@ -19,17 +28,11 @@ LANG=en_US.UTF-8 snap list --all | awk '/disabled/{print $1, $3}' | while read s
     sudo snap remove "$snapname" --revision="$revision"
 done 
 
-# apt
-sudo apt update -y && sudo apt upgrade -y && sudo apt autoremove -y && sudo apt clean
-
 # cache
 sudo rm -rf ~/.cache/*   # Safe to nuke caches
 sudo rm -rf /var/lib/snapd/cache/*
 
-# All directories (hidden + normal) — most useful
-du -sh .[^.]* * | sort -h
-# Quick one-liner (very popular)
-du -ahd1 | sort -h
+
 
 
 # Quick & Safe Clean (Recommended first step)
