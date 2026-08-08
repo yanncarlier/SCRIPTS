@@ -20,3 +20,7 @@ sudo zfs unmount storagepool/data
 sudo zfs unmount -f storagepool/data
 
 sudo zfs mount storagepool/data
+
+sudo zpool upgrade default
+
+sudo zpool status
