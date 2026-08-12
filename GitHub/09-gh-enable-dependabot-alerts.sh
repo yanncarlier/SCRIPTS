@@ -10,6 +10,7 @@
 #
 # Usage:
 #  REPOS="repo1,repo2" OWNER="username" bash 9-gh-enable-dependabot-alerts.sh
+#  If REPOS is empty, public repos for OWNER are fetched.
 
 set -euo pipefail
 
@@ -20,10 +21,12 @@ REPOS_TO_PROCESS=()
 echo "Preparing to enable Dependabot alerts for $OWNER..."
 
 if [ -z "${REPOS}" ]; then
-  echo "ERROR: No repositories specified."
-  echo "Provide a comma-separated list via the REPOS variable:"
-  echo "  REPOS=\"repo1,repo2\" OWNER=\"username\" bash 9-gh-enable-dependabot-alerts.sh"
-  exit 1
+  echo "  (fetching public repositories for $OWNER)"
+  REPOS=$(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public | paste -sd, -)
+  if [ -z "${REPOS}" ]; then
+    echo "ERROR: No public repositories found for $OWNER."
+    exit 1
+  fi
 fi
 
 # Parse comma-separated REPOS and normalize
