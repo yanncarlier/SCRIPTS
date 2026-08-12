@@ -149,12 +149,7 @@ pnpm store prune
 du -sh ~/.local/share/* | sort -hr | head -12
 
 
-
-
-
-
-
-
+# find . -type d \( -name ".venv" -o -name "node_modules" \) -exec rm -rf {} +
 
 
 

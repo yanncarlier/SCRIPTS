@@ -24,3 +24,6 @@ sudo zfs mount storagepool/data
 sudo zpool upgrade default
 
 sudo zpool status
+
+sudo fuser -mv /storagepool/data
+

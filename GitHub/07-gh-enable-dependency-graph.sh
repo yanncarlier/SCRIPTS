@@ -6,6 +6,10 @@
 #  - `gh` installed and authenticated: `gh auth login`
 #  - Admin access to the target repositories
 #
+# Note: There is no REST endpoint for the dependency graph itself; GitHub
+#       enables it via `PUT /repos/{owner}/{repo}/vulnerability-alerts`,
+#       which also enables Dependabot alerts.
+#
 # Usage:
 #  REPOS="repo1,repo2" OWNER="username" bash 7-gh-enable-dependency-graph.sh
 
@@ -47,8 +51,8 @@ for repo in "${REPOS_TO_PROCESS[@]}"; do
     continue
   fi
 
-  # Attempt to enable dependency graph via API
-  if gh api "repos/$repo/dependency-graph" --method PUT -f enabled=true >/dev/null 2>&1; then
+  # Attempt to enable dependency graph (and Dependabot alerts) via API
+  if gh api "repos/$repo/vulnerability-alerts" --method PUT >/dev/null 2>&1; then
     echo "  -> Dependency graph enabled for $repo"
     count=$((count+1))
   else

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# 04-gh-enable-secret-scanning.sh
-# Summary: Enable GitHub Advanced Security Secret Scanning (Secret Protection)
+# 02-gh-enable-push-protection.sh
+# Summary: Enable GitHub Advanced Security Push Protection (Secret Scanning Push Protection)
 # for one or more repositories using the GitHub CLI (`gh`).
 #
 # Prerequisites:
 #  - `gh` (GitHub CLI) installed and authenticated: `gh auth login`
 #  - Admin access to target repositories and GH Advanced Security available
+#  - Secret scanning must be enabled first
 #
 # Usage:
-#  REPOS="repo1,repo2" OWNER="username" bash 04-gh-enable-secret-scanning.sh
+#  REPOS="repo1,repo2" OWNER="username" bash 04-gh-enable-push-protection.sh
 
 set -euo pipefail
 
@@ -16,12 +17,12 @@ OWNER=${OWNER:-"username"}
 REPOS=${REPOS:-""}
 REPOS_TO_PROCESS=()
 
-echo "Preparing to enable secret scanning (secret protection) for $OWNER..."
+echo "Preparing to enable push protection for $OWNER..."
 
 if [ -z "${REPOS}" ]; then
   echo "ERROR: No repositories specified."
   echo "Provide a comma-separated list via the REPOS variable:" \
-       "REPOS=\"repo1,repo2\" OWNER=\"username\" bash 11-gh-enable-secret-scanning.sh"
+       "REPOS=\"repo1,repo2\" OWNER=\"username\" bash 12-gh-enable-push-protection.sh"
   exit 1
 fi
 
@@ -45,15 +46,23 @@ for repo_name in "${REPOS_TO_PROCESS[@]}"; do
     continue
   fi
 
-  # Enable secret scanning via API
+  # Check if secret scanning is enabled (required for push protection)
+  secret_scanning=$(gh api "repos/$repo" --jq '.security_and_analysis.secret_scanning.status' 2>/dev/null || echo "disabled")
+  if [ "$secret_scanning" != "enabled" ]; then
+    echo "  -> WARNING: Secret scanning is not enabled. Push protection requires secret scanning to be enabled first."
+    echo "  -> Skipping $repo"
+    continue
+  fi
+
+  # Enable push protection via API
   # Use PATCH on the repo endpoint with security_and_analysis settings
-  if gh api "repos/$repo" --method PATCH -f security_and_analysis[secret_scanning][status]=enabled >/dev/null 2>&1; then
-    echo "  -> Secret scanning (secret protection) enabled for $repo"
+  if gh api "repos/$repo" --method PATCH -f security_and_analysis[secret_scanning_push_protection][status]=enabled >/dev/null 2>&1; then
+    echo "  -> Push protection enabled for $repo"
     count=$((count+1))
   else
-    echo "  -> ERROR: Failed to enable secret scanning for $repo"
+    echo "  -> ERROR: Failed to enable push protection for $repo"
   fi
 done
 
 echo "=========================================="
-echo "Done. Enabled secret scanning for $count repositories."
+echo "Done. Enabled push protection for $count repositories."
