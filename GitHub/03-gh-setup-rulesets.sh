@@ -10,6 +10,7 @@
 #  OWNER="username" bash 03-gh-setup-rulesets.sh
 #  REPOS="my-repo" OWNER="username" bash 03-gh-setup-rulesets.sh
 #  REPOS="repo1,repo2" OWNER="username" bash 03-gh-setup-rulesets.sh
+#  If empty, public repos for OWNER are fetched.
 
 set -euo pipefail
 
