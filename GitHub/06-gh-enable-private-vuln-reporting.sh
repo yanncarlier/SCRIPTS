@@ -9,6 +9,7 @@
 #
 # Usage:
 #  REPOS="repo1,repo2" OWNER="username" bash 6-gh-enable-private-vuln-reporting.sh
+#  If empty, public repos for OWNER are fetched.
 
 set -euo pipefail
 
@@ -19,10 +20,12 @@ REPOS_TO_PROCESS=()
 echo "Preparing to enable private vulnerability reporting for $OWNER..."
 
 if [ -z "${REPOS}" ]; then
-  echo "ERROR: No repositories specified."
-  echo "Provide a comma-separated list via the REPOS variable:" \
-       "REPOS=\"repo1,repo2\" OWNER=\"username\" bash 6-gh-enable-private-vuln-reporting.sh"
-  exit 1
+  echo "  (fetching public repositories for $OWNER)"
+  REPOS=$(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public | paste -sd, -)
+  if [ -z "${REPOS}" ]; then
+    echo "ERROR: No public repositories found for $OWNER."
+    exit 1
+  fi
 fi
 
 # Split comma-separated string into array and trim whitespace
@@ -34,7 +37,11 @@ done
 
 count=0
 for repo_name in "${REPOS_TO_PROCESS[@]}"; do
-  repo="$OWNER/$repo_name"
+  if [[ "$repo_name" == *"/"* ]]; then
+    repo="$repo_name"
+  else
+    repo="$OWNER/$repo_name"
+  fi
   echo "=========================================="
   echo "Processing $repo"
 

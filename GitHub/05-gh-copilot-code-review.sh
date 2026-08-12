@@ -9,6 +9,7 @@
 #
 # Usage examples:
 #  REPOS="my-repo" OWNER="username" bash 5-gh-copilot-code-review.sh
+#  If empty, public repos for OWNER are fetched.
 
 set -euo pipefail
 
