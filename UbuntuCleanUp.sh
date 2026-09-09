@@ -152,8 +152,19 @@ du -sh ~/.local/share/* | sort -hr | head -12
 # find . -type d \( -name ".venv" -o -name "node_modules" \) -exec rm -rf {} +
 
 
-
-
+# (Added -prune before -exec so find doesn't try to descend into matched directories before removing them, saving significant execution time.)
+find . -type d \( \
+  -name ".venv" \
+  -o -name "node_modules" \
+  -o -name "target" \
+  -o -name ".cache" \
+  -o -name ".parcel-cache" \
+  -o -name "build" \
+  -o -name "dist" \
+  -o -name ".next" \
+  -o -name ".turbo" \
+  -o -name "coverage" \
+\) -prune -exec rm -rf {} +
 
 
 

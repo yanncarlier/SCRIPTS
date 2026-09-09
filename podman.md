@@ -34,4 +34,7 @@ sudo apt-get install -y podman podman-docker podman-compose
 podman-compose up -d
 
 
+podman system prune -a --volumes
+sudo rm -rf ./.local/share/containers/
+
 ```

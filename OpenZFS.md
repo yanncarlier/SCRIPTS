@@ -15,9 +15,15 @@ Your storage is now ready and automatically mounted at /storagepool/data
 
 sudo chown -R y:y /storagepool/data
 
-sudo zfs unmount storagepool/data
 
-sudo zfs unmount -f storagepool/data
+
+
+
+sudo zpool list
+
+sudo zfs list
+
+sudo zfs set mountpoint=/storagepool/data default/data
 
 sudo zfs mount storagepool/data
 
@@ -26,4 +32,12 @@ sudo zpool upgrade default
 sudo zpool status
 
 sudo fuser -mv /storagepool/data
+
+
+
+
+
+sudo zfs unmount storagepool/data
+
+sudo zfs unmount -f storagepool/data
 
