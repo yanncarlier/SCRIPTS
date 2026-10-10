@@ -54,9 +54,19 @@ find ~/.gradle/caches -type f -atime +30 -delete   # Delete files not accessed i
 du -sh ~/.config/* | sort -hr | head -n 20
 
 # VS Code
-rm -rf ~/.config/Code/CachedData/
-rm -rf ~/.config/Code/Cache/
-rm -rf ~/.config/Code/Service Worker/
+du -h --max-depth=1 ~/.config/Code | sort -hr
+
+rm -rf ~/.config/Code/Cache/*
+rm -rf ~/.config/Code/CachedData/*
+rm -rf ~/.config/Code/logs/*
+rm -rf ~/.config/Code/Service\ Worker/CacheStorage/*
+
+rm -rf ~/.config/Code/User/workspaceStorage/*
+rm -rf ~/.config/Code/snap/code/current/.local/share/Trash/*
+
+
+
+
 
 # Discord
 rm -rf ~/.config/discord/Cache/

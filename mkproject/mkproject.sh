@@ -16,15 +16,20 @@ mkdir -p \
   "$PROJECT/Frontend" \
   "$PROJECT/Backend" \
   "$PROJECT/Mobile/" \
-  "$PROJECT/Docs" \
-  "$PROJECT/Infra" \
+  "$PROJECT/Documentation" \
+  "$PROJECT/Infrastructure" \
+  "$PROJECT/Cybersecurity" \
+  "$PROJECT/Configurations" \
   "$PROJECT/Desktop" \
-  "$PROJECT/gitignore"
+  "$PROJECT/gitignore" \
+  "$PROJECT/Offline"
 
 echo "Created project structure in: $PROJECT"
 
 
 # Create the empty root files
-touch "$PROJECT/README.md" "$PROJECT/.gitignore"
-cat gitignores/VisualStudio.gitignore >> "$PROJECT/.gitignore"
+touch "$PROJECT/README.md" 
+touch "$PROJECT/.gitignore"
+cat ./gitignores/VisualStudio.gitignore >> "$PROJECT/.gitignore"
+echo gitignore >> "$PROJECT/.gitignore"
 echo gitignore >> "$PROJECT/.gitignore"

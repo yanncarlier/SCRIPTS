@@ -10,3 +10,8 @@ done
 
 # Even shorter one-liner version:
 # find . -type d -name ".git" -execdir git pull --quiet --ff-only \;
+
+
+# find git repos and related up repos url
+#find . -type d -name ".git" | xargs -i grep url "{}/config"
+
