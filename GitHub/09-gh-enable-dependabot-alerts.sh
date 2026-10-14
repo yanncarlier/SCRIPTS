@@ -1,66 +1,46 @@
 #!/usr/bin/env bash
-# 9-gh-enable-dependabot-alerts.sh
-# Summary: Enable Dependabot alerts for one or more repositories
-# using the GitHub CLI (`gh`).
-# This covers vulnerability alerts and malware alerts coverage.
+# 09-gh-enable-dependabot-alerts.sh
+# Summary: Enable Dependabot alerts (vulnerable dependency alerts) for one or
+# more repositories using the GitHub CLI (`gh`).
+#
+# Note: `PUT /repos/{owner}/{repo}/vulnerability-alerts` is the single toggle
+#       behind Dependabot alerts, the dependency graph (07) and the malware
+#       alert coverage (11). Scripts 07, 09 and 11 check the current state
+#       first, so after one of them has run the others report "already".
 #
 # Prerequisites:
 #  - `gh` installed and authenticated: `gh auth login`
 #  - Admin access to the target repositories
 #
 # Usage:
-#  REPOS="repo1,repo2" OWNER="username" bash 9-gh-enable-dependabot-alerts.sh
-#  If REPOS is empty, public repos for OWNER are fetched.
+#  REPOS="repo1,repo2" OWNER="username" bash 09-gh-enable-dependabot-alerts.sh
+#  DRY_RUN=1 bash 09-gh-enable-dependabot-alerts.sh
+#  Default target: all public repos of OWNER.
+#
+# Related: 10-gh-enable-dependabot-security-updates.sh (auto-fix PRs)
 
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
-OWNER=${OWNER:-"username"}
-REPOS=${REPOS:-""}
-REPOS_TO_PROCESS=()
+init_targets
+log "Enabling Dependabot alerts for ${#TARGETS[@]} repositories..."
 
-echo "Preparing to enable Dependabot alerts for $OWNER..."
+for repo in "${TARGETS[@]}"; do
+  repo_header "$repo"
 
-if [ -z "${REPOS}" ]; then
-  echo "  (fetching public repositories for $OWNER)"
-  REPOS=$(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public | paste -sd, -)
-  if [ -z "${REPOS}" ]; then
-    echo "ERROR: No public repositories found for $OWNER."
-    exit 1
-  fi
-fi
-
-# Parse comma-separated REPOS and normalize
-IFS=',' read -r -a REPOS_ARRAY <<< "$REPOS"
-for r in "${REPOS_ARRAY[@]}"; do
-  r="${r// /}"
-  if [[ "$r" == *"/"* ]]; then
-    REPOS_TO_PROCESS+=("$r")
-  else
-    REPOS_TO_PROCESS+=("$OWNER/$r")
-  fi
-done
-
-count=0
-for repo in "${REPOS_TO_PROCESS[@]}"; do
-  echo "=========================================="
-  echo "Processing $repo"
-
-  # Skip archived repositories
-  archived=$(gh api "repos/$repo" --jq '.archived' 2>/dev/null || echo "false")
-  if [ "$archived" = "true" ]; then
-    echo "  -> Skipping archived repository"
+  if is_archived "$repo"; then
+    skipped "archived repository"
     continue
   fi
 
-  # Enable Dependabot alerts via API
-  # The vulnerability alerts endpoint historically returns 204 on success
-  if gh api "repos/$repo/vulnerability-alerts" --method PUT >/dev/null 2>&1; then
-    echo "  -> Dependabot alerts enabled for $repo"
-    count=$((count+1))
-  else
-    echo "  -> ERROR: Failed to enable Dependabot alerts for $repo"
+  if api_status "repos/$repo/vulnerability-alerts"; then
+    already "Dependabot alerts"
+    continue
   fi
+
+  step "Dependabot alerts enabled" \
+    gh api "repos/$repo/vulnerability-alerts" --method PUT
 done
 
-echo "=========================================="
-echo "Done. Enabled Dependabot alerts for $count repositories."
+finish

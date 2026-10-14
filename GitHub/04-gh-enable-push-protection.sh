@@ -1,75 +1,52 @@
 #!/usr/bin/env bash
-# 02-gh-enable-push-protection.sh
-# Summary: Enable GitHub Advanced Security Push Protection (Secret Scanning Push Protection)
-# for one or more repositories using the GitHub CLI (`gh`).
+# 04-gh-enable-push-protection.sh
+# Summary: Enable secret scanning push protection for one or more repositories
+# using the GitHub CLI (`gh`).
 #
 # Prerequisites:
-#  - `gh` (GitHub CLI) installed and authenticated: `gh auth login`
-#  - Admin access to target repositories and GH Advanced Security available
-#  - Secret scanning must be enabled first
+#  - `gh` installed and authenticated: `gh auth login`
+#  - Admin access to the target repositories
+#  - Secret scanning must be enabled first (02-gh-enable-secret-scanning.sh)
 #
 # Usage:
 #  REPOS="repo1,repo2" OWNER="username" bash 04-gh-enable-push-protection.sh
-#  If empty, public repos for OWNER are fetched.
+#  DRY_RUN=1 bash 04-gh-enable-push-protection.sh
+#  Default target: all public repos of OWNER.
 
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
-OWNER=${OWNER:-"username"}
-REPOS=${REPOS:-""}
-REPOS_TO_PROCESS=()
+init_targets
+log "Enabling push protection for ${#TARGETS[@]} repositories..."
 
-echo "Preparing to enable push protection for $OWNER..."
+for repo in "${TARGETS[@]}"; do
+  repo_header "$repo"
 
-if [ -z "${REPOS}" ]; then
-  echo "  (fetching public repositories for $OWNER)"
-  REPOS=$(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public | paste -sd, -)
-  if [ -z "${REPOS}" ]; then
-    echo "ERROR: No public repositories found for $OWNER."
-    exit 1
-  fi
-fi
-
-# Split comma-separated string into array and trim whitespace
-IFS=',' read -r -a REPOS_ARRAY <<< "$REPOS"
-for r in "${REPOS_ARRAY[@]}"; do
-  r="${r// /}"
-  REPOS_TO_PROCESS+=("$r")
-done
-
-count=0
-for repo_name in "${REPOS_TO_PROCESS[@]}"; do
-  if [[ "$repo_name" == *"/"* ]]; then
-    repo="$repo_name"
-  else
-    repo="$OWNER/$repo_name"
-  fi
-  echo "=========================================="
-  echo "Processing $repo"
-
-  # Skip archived repositories
-  archived=$(gh api "repos/$repo" --jq '.archived' 2>/dev/null || echo "false")
-  if [ "$archived" = "true" ]; then
-    echo "  -> Skipping archived repository"
+  if is_archived "$repo"; then
+    skipped "archived repository"
     continue
   fi
 
-  # Check if secret scanning is enabled (required for push protection)
-  secret_scanning=$(gh api "repos/$repo" --jq '.security_and_analysis.secret_scanning.status' 2>/dev/null || echo "disabled")
-  if [ "$secret_scanning" != "enabled" ]; then
-    echo "  -> WARNING: Secret scanning is not enabled. Push protection requires secret scanning to be enabled first."
-    echo "  -> Skipping $repo"
+  secret_state="$(get_repo "$repo" '.security_and_analysis.secret_scanning.status // "unknown"')"
+  if [[ "$secret_state" != "enabled" ]]; then
+    printf '  %sWARNING:%s secret scanning is "%s" - push protection requires it first.\n' \
+      "$C_YELLOW" "$C_OFF" "$secret_state"
+    printf '         Run 02-gh-enable-secret-scanning.sh before this script.\n'
+    skipped "secret scanning not enabled"
     continue
   fi
 
-  # Enable push protection via API
-  # Use PATCH on the repo endpoint with security_and_analysis settings
-  if gh api "repos/$repo" --method PATCH -f security_and_analysis[secret_scanning_push_protection][status]=enabled >/dev/null 2>&1; then
-    echo "  -> Push protection enabled for $repo"
-    count=$((count+1))
-  else
-    echo "  -> ERROR: Failed to enable push protection for $repo"
+  state="$(get_repo "$repo" '.security_and_analysis.secret_scanning_push_protection.status // "unknown"')"
+  if [[ "$state" == "enabled" ]]; then
+    already "push protection"
+    continue
   fi
+  log "  current state: $state"
+
+  step "push protection enabled" \
+    gh api "repos/$repo" --method PATCH \
+    -f 'security_and_analysis[secret_scanning_push_protection][status]=enabled'
 done
 
-echo "=========================================="
-echo "Done. Enabled push protection for $count repositories."
+finish

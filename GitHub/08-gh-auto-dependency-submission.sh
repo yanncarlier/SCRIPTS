@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 8-gh-auto-dependency-submission.sh
+# 08-gh-auto-dependency-submission.sh
 # Summary: Submit dependency snapshots to GitHub's dependency submission API
 # for one or more repositories using the GitHub CLI (`gh`).
 #
@@ -14,46 +14,33 @@
 # repo, set SNAPSHOT_FILE to a valid snapshot JSON payload (see
 # https://docs.github.com/en/rest/dependency-graph/dependency-submission).
 #
+# Tip: a one-shot local snapshot goes stale quickly. For continuous coverage,
+# run the official dependency-submission action from a GitHub Actions workflow
+# on every push instead of (or in addition to) this script.
+#
 # Prerequisites:
 #  - `gh` installed and authenticated: `gh auth login`
-#  - Admin or write access to target repositories
+#  - python3 available on PATH
+#  - Write access to the target repositories
 #
 # Usage:
-#  REPOS="repo1,repo2" OWNER="username" bash 8-gh-auto-dependency-submission.sh
-#  REPOS="repo1" OWNER="username" SNAPSHOT_FILE="./snapshot.json" bash 8-gh-auto-dependency-submission.sh
-#  If REPOS is empty, public repos for OWNER are fetched.
+#  REPOS="repo1,repo2" OWNER="username" bash 08-gh-auto-dependency-submission.sh
+#  REPOS="repo1" OWNER="username" SNAPSHOT_FILE="./snapshot.json" bash 08-gh-auto-dependency-submission.sh
+#  DRY_RUN=1 bash 08-gh-auto-dependency-submission.sh
+#  Default target: all public repos of OWNER.
 
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
-OWNER=${OWNER:-"username"}
-REPOS=${REPOS:-""}
 SNAPSHOT_FILE=${SNAPSHOT_FILE:-""}
-REPOS_TO_PROCESS=()
 
-if [ -z "$REPOS" ]; then
-  echo "  (fetching public repositories for $OWNER)"
-  REPOS=$(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public | paste -sd, -)
-  if [ -z "$REPOS" ]; then
-    echo "ERROR: No public repositories found for $OWNER."
-    exit 1
-  fi
+command -v python3 >/dev/null 2>&1 ||
+  die "python3 is required to build dependency snapshots"
+
+if [[ -n "$SNAPSHOT_FILE" && ! -f "$SNAPSHOT_FILE" ]]; then
+  die "Snapshot file not found: $SNAPSHOT_FILE"
 fi
-
-if [ -n "$SNAPSHOT_FILE" ] && [ ! -f "$SNAPSHOT_FILE" ]; then
-  echo "ERROR: Snapshot file not found: $SNAPSHOT_FILE"
-  exit 1
-fi
-
-# Parse comma-separated REPOS and normalize
-IFS=',' read -r -a REPOS_ARRAY <<< "$REPOS"
-for r in "${REPOS_ARRAY[@]}"; do
-  r="${r// /}"
-  if [[ "$r" == *"/"* ]]; then
-    REPOS_TO_PROCESS+=("$r")
-  else
-    REPOS_TO_PROCESS+=("$OWNER/$r")
-  fi
-done
 
 # Build a valid snapshot payload from downloaded manifests in a directory.
 # Usage: build_snapshot <manifest-dir> <sha> <ref> <output-json>
@@ -168,8 +155,8 @@ snapshot = {
     "job": {"correlator": "gh-auto-dependency-submission", "id": "snapshot-run-1"},
     "detector": {
         "name": "gh-dependency-submission-detector",
-        "version": "2.0.0",
-        "url": "https://github.com/yanncarlier/scripts",
+        "version": "3.0.0",
+        "url": "https://github.com/cli/cli",
     },
     "scanned": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     "manifests": manifests,
@@ -180,63 +167,63 @@ with open(out_file, "w") as f:
 PYEOF
 }
 
-count=0
-skipped=0
-for repo in "${REPOS_TO_PROCESS[@]}"; do
-  echo "=========================================="
-  echo "Processing $repo"
+# One temp root for the whole run, removed on exit (the old per-iteration
+# trap only ever cleaned up the last directory).
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/ghsec-depsub.XXXXXX")"
+trap 'rm -rf "$TMP_ROOT"' EXIT
 
-  # Skip archived repositories
-  archived=$(gh api "repos/$repo" --jq '.archived' 2>/dev/null || echo "false")
-  if [ "$archived" = "true" ]; then
-    echo "  -> Skipping archived repository"
-    skipped=$((skipped+1))
+init_targets
+log "Submitting dependency snapshots for ${#TARGETS[@]} repositories..."
+
+for repo in "${TARGETS[@]}"; do
+  repo_header "$repo"
+
+  if is_archived "$repo"; then
+    skipped "archived repository"
     continue
   fi
 
-  if [ -n "$SNAPSHOT_FILE" ]; then
+  if [[ -n "$SNAPSHOT_FILE" ]]; then
     snapshot="$SNAPSHOT_FILE"
   else
-    branch=$(gh api "repos/$repo" --jq '.default_branch')
-    sha=$(gh api "repos/$repo/commits/$branch" --jq '.sha')
+    branch="$(get_repo "$repo" '.default_branch' main)"
+    sha="$(gh api "repos/$repo/commits/$branch" --jq '.sha' 2>/dev/null || true)"
+    if [[ -z "$sha" ]]; then
+      skipped "could not resolve the head commit of $branch"
+      continue
+    fi
 
-    tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "$tmp_dir"' EXIT
+    tmp_dir="$(mktemp -d "$TMP_ROOT/run.XXXXXX")"
 
     # Download supported manifests from the repo root
     found=0
     for mf in package-lock.json Cargo.lock pubspec.lock requirements.txt pyproject.toml; do
       if gh api "repos/$repo/contents/$mf" \
-          -H "Accept: application/vnd.github.raw+json" > "$tmp_dir/$mf" 2>/dev/null; then
+        -H "Accept: application/vnd.github.raw+json" >"$tmp_dir/$mf" 2>/dev/null; then
         found=1
+      else
+        rm -f "$tmp_dir/$mf"
       fi
     done
 
-    if [ "$found" -eq 0 ]; then
-      echo "  -> Skipping: no supported manifest found (package-lock.json, Cargo.lock, pubspec.lock, requirements.txt, pyproject.toml)"
-      skipped=$((skipped+1))
+    if [[ "$found" -eq 0 ]]; then
+      skipped "no supported manifest found (package-lock.json, Cargo.lock, pubspec.lock, requirements.txt, pyproject.toml)"
       continue
     fi
 
     snapshot="$tmp_dir/snapshot.json"
     if ! build_snapshot "$tmp_dir" "$sha" "refs/heads/$branch" "$snapshot"; then
-      echo "  -> Skipping: no resolvable (pinned) dependencies found in manifests"
-      skipped=$((skipped+1))
+      skipped "no resolvable (pinned) dependencies found in manifests"
       continue
     fi
 
-    manifest_names=$(python3 -c "import json,sys; print(', '.join(sorted(json.load(open('$snapshot'))['manifests'].keys())))")
-    n_deps=$(python3 -c "import json,sys; print(sum(len(m['resolved']) for m in json.load(open('$snapshot'))['manifests'].values()))")
-    echo "  -> Snapshot generated for $repo ($n_deps deps from $manifest_names, sha $(echo "$sha" | cut -c1-8))"
+    manifest_names="$(python3 -c 'import json,sys; print(", ".join(sorted(json.load(open(sys.argv[1]))["manifests"].keys())))' "$snapshot")"
+    n_deps="$(python3 -c 'import json,sys; print(sum(len(m["resolved"]) for m in json.load(open(sys.argv[1]))["manifests"].values()))' "$snapshot")"
+    log "  -> snapshot: $n_deps dependencies from $manifest_names (sha ${sha:0:8})"
   fi
 
-  # POST the snapshot JSON to the dependency submission endpoint
-  if gh api "repos/$repo/dependency-graph/snapshots" --method POST --input "$snapshot" --jq '.result + ": " + .message' 2>/dev/null; then
-    count=$((count+1))
-  else
-    echo "  -> ERROR: Failed to submit snapshot for $repo"
-  fi
+  step "snapshot submitted" \
+    gh api "repos/$repo/dependency-graph/snapshots" --method POST --input "$snapshot"
 done
 
-echo "=========================================="
-echo "Done. Snapshot submitted for $count repositories, skipped $skipped."
+finish

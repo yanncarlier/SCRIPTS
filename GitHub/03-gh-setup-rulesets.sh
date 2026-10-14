@@ -1,82 +1,117 @@
 #!/usr/bin/env bash
-# 3-gh-setup-rulesets.sh
-# Summary: Create or replace repository rulesets to enforce branch protection
-# policies for target repositories. Uses the GitHub CLI (`gh`).
+# 03-gh-setup-rulesets.sh
+# Summary: Create or update (upsert) the branch protection ruleset for one or
+# more repositories using the GitHub CLI (`gh`). The ruleset is NOT deleted
+# and recreated: an existing ruleset with the same name is updated in place,
+# so protection never drops during a re-run and manual edits are preserved
+# on other rulesets.
 #
 # Prerequisites:
 #  - `gh` installed and authenticated with admin access to target repos.
 #
-# Usage examples:
+# Usage:
 #  OWNER="username" bash 03-gh-setup-rulesets.sh
-#  REPOS="my-repo" OWNER="username" bash 03-gh-setup-rulesets.sh
 #  REPOS="repo1,repo2" OWNER="username" bash 03-gh-setup-rulesets.sh
-#  If empty, public repos for OWNER are fetched.
+#  DRY_RUN=1 bash 03-gh-setup-rulesets.sh
+#  REQUIRED_APPROVALS=2 BLOCK_DIRECT_PUSH=0 bash 03-gh-setup-rulesets.sh
+#
+# Environment variables:
+#  - RULESET_NAME             name of the managed ruleset
+#                             (default: protect-default-branch)
+#  - PROTECT_BRANCHES         comma separated refs to protect
+#                             (default: ~DEFAULT_BRANCH,refs/heads/dev)
+#  - REQUIRED_APPROVALS       approving reviews required (default: 1)
+#  - REQUIRE_LAST_PUSH_APPROVAL  block self-approval of your own push (default: 1)
+#  - REQUIRE_THREAD_RESOLUTION   all review threads resolved (default: 1)
+#  - BLOCK_DIRECT_PUSH        only bypass roles may update the refs, i.e.
+#                             everyone else must use a PR (default: 1)
+#  - REQUIRE_LINEAR_HISTORY   forbid merge commits (default: 0)
+#  - BYPASS_MODE              always | pull_request | exempt (default: always)
+#                             "pull_request" is stricter: admins can only
+#                             bypass while merging a PR, never by pushing.
+#  - DRY_RUN=1                print the payload instead of applying it
 
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
-# Note: run `gh auth login` to authenticate before executing this script
+# === CONFIGURATION =======================================================
 
-# === CONFIGURATION ===
-# OWNER: GitHub user or org name (override via environment: OWNER="username")
-OWNER=${OWNER:-"username"}
+RULESET_NAME=${RULESET_NAME:-protect-default-branch}
+PROTECT_BRANCHES=${PROTECT_BRANCHES:-"~DEFAULT_BRANCH,refs/heads/dev"}
+REQUIRED_APPROVALS=${REQUIRED_APPROVALS:-1}
+REQUIRE_LAST_PUSH_APPROVAL=${REQUIRE_LAST_PUSH_APPROVAL:-1}
+REQUIRE_THREAD_RESOLUTION=${REQUIRE_THREAD_RESOLUTION:-1}
+BLOCK_DIRECT_PUSH=${BLOCK_DIRECT_PUSH:-1}
+REQUIRE_LINEAR_HISTORY=${REQUIRE_LINEAR_HISTORY:-0}
+BYPASS_MODE=${BYPASS_MODE:-always}
 
-# REPOS: Target specific repo(s). Can be set via environment as single or comma-separated list.
-# Examples: REPOS="my-repo" or REPOS="repo1,repo2"
-# If not provided, script fetches public repos for OWNER.
+# Admin role id (RepositoryRole 5) keeps a way to merge when nobody else can.
+BYPASS_ACTOR_ID=${BYPASS_ACTOR_ID:-5}
 
-# If the user provided REPOS via the environment, honor it and convert to an array.
-if [ -n "${REPOS:-}" ]; then
-  echo "Using provided REPOS from environment"
-  # Convert comma-separated list to array, handling spaces
-  IFS=',' read -r -a __tmp <<< "$REPOS"
-  REPOS=()
-  for r in "${__tmp[@]}"; do
-    # Trim whitespace
-    r="${r// /}"
-    # Always prefix with OWNER
-    REPOS+=("$OWNER/$r")
-  done
-else
-  # REPOS not provided: fetch public repositories from GitHub
-  echo "Fetching public repositories for $OWNER..."
-  # Fetch only public repos for the owner
-  mapfile -t REPOS < <(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public)
+# === VALIDATION ==========================================================
+
+[[ "$RULESET_NAME" =~ ^[A-Za-z0-9._\ -]+$ ]] ||
+  die "RULESET_NAME may only contain letters, digits, spaces, dot, dash and underscore"
+[[ "$REQUIRED_APPROVALS" =~ ^[0-9]+$ ]] ||
+  die "REQUIRED_APPROVALS must be a number (got: $REQUIRED_APPROVALS)"
+for flag in REQUIRE_LAST_PUSH_APPROVAL REQUIRE_THREAD_RESOLUTION BLOCK_DIRECT_PUSH REQUIRE_LINEAR_HISTORY; do
+  [[ "${!flag}" =~ ^[01]$ ]] ||
+    die "$flag must be 0 or 1 (got: ${!flag})"
+done
+[[ "$BYPASS_MODE" == "always" || "$BYPASS_MODE" == "pull_request" || "$BYPASS_MODE" == "exempt" ]] ||
+  die "BYPASS_MODE must be always, pull_request or exempt (got: $BYPASS_MODE)"
+
+bool() {
+  if [[ "$1" == "1" ]]; then printf 'true'; else printf 'false'; fi
+}
+
+# === BRANCH LIST =========================================================
+
+include_json=""
+IFS=',' read -r -a branches <<<"$PROTECT_BRANCHES"
+for b in "${branches[@]}"; do
+  b="${b// /}"
+  [[ -z "$b" ]] && continue
+  if [[ "$b" == *'"'* || "$b" == *'\'* ]]; then
+    die "PROTECT_BRANCHES contains an unsupported character: $b"
+  fi
+  include_json+="\"$b\","
+done
+include_json="${include_json%,}"
+[[ -n "$include_json" ]] || die "PROTECT_BRANCHES is empty"
+
+# === OPTIONAL RULES ======================================================
+
+extra_rules=""
+if [[ "$BLOCK_DIRECT_PUSH" == "1" ]]; then
+  extra_rules+=$',\n    { "type": "update", "parameters": { "update_allows_fetch_and_merge": true } }'
+fi
+if [[ "$REQUIRE_LINEAR_HISTORY" == "1" ]]; then
+  extra_rules+=$',\n    { "type": "required_linear_history" }'
 fi
 
-echo "Found ${#REPOS[@]} repositories to process."
-echo "--------------------------------------------------"
+# === PAYLOAD =============================================================
 
-RULESET_NAME="protect-default-branch"
+payload="$(mk_payload_file)"
+trap 'rm -f "$payload"' EXIT
 
-echo
-for REPO in "${REPOS[@]}"; do
-  echo "=================================================="
-  echo "Processing $REPO"
-  # 1. DELETE existing ruleset if it exists
-  # Fix: ensure '$REPO' (singular) is used for the API call
-  EXISTING_ID=$(gh api "repos/$REPO/rulesets" --jq "map(select(.name == \"$RULESET_NAME\")) | .[0].id // empty")
-  if [[ -n "$EXISTING_ID" ]]; then
-    echo "  -> Found existing ruleset (ID: $EXISTING_ID). Deleting..."
-    gh api "repos/$REPO/rulesets/$EXISTING_ID" --method DELETE >/dev/null
-  fi
-  # 2. Define JSON Payload (Create new)
-  # Fix: Change bypass_actors to use RepositoryRole (ID 5 for Admin) instead of RepositoryActor
-  cat <<EOF > /tmp/ruleset.json
+cat >"$payload" <<EOF
 {
   "name": "$RULESET_NAME",
   "target": "branch",
   "enforcement": "active",
   "conditions": {
     "ref_name": {
-      "include": [ "~DEFAULT_BRANCH" ],
+      "include": [ $include_json ],
       "exclude": []
     }
   },
   "bypass_actors": [
     {
-      "actor_id": 5,
+      "actor_id": $BYPASS_ACTOR_ID,
       "actor_type": "RepositoryRole",
-      "bypass_mode": "always"
+      "bypass_mode": "$BYPASS_MODE"
     }
   ],
   "rules": [
@@ -87,25 +122,53 @@ for REPO in "${REPOS[@]}"; do
       "parameters": {
         "dismiss_stale_reviews_on_push": true,
         "require_code_owner_review": true,
-        "require_last_push_approval": false,
-        "required_approving_review_count": 0,
-        "required_review_thread_resolution": false
+        "require_last_push_approval": $(bool "$REQUIRE_LAST_PUSH_APPROVAL"),
+        "required_approving_review_count": $REQUIRED_APPROVALS,
+        "required_review_thread_resolution": $(bool "$REQUIRE_THREAD_RESOLUTION")
       }
-    }
+    }$extra_rules
   ]
 }
 EOF
-  # 3. Create the Ruleset (POST)
-  if gh api "repos/$REPO/rulesets" --method POST --input /tmp/ruleset.json >/dev/null 2>&1; then
-    echo "  -> Ruleset created successfully"
-  else
-    echo "  -> ERROR: Failed to create ruleset (Validation error likely). Check the JSON payload."
+
+log "Ruleset '$RULESET_NAME'"
+log "  protects:       $PROTECT_BRANCHES"
+log "  approvals:      $REQUIRED_APPROVALS (last-push approval: $REQUIRE_LAST_PUSH_APPROVAL, threads: $REQUIRE_THREAD_RESOLUTION)"
+log "  direct pushes:  $([[ "$BLOCK_DIRECT_PUSH" == "1" ]] && echo "blocked (PR required)" || echo "allowed")"
+log "  linear history: $([[ "$REQUIRE_LINEAR_HISTORY" == "1" ]] && echo "required" || echo "not required")"
+log "  bypass:         RepositoryRole id $BYPASS_ACTOR_ID, mode $BYPASS_MODE"
+if [[ "$DRY_RUN" == "1" ]]; then
+  log "  payload:"
+  sed 's/^/    /' "$payload"
+fi
+
+# === APPLY ===============================================================
+
+init_targets
+
+for repo in "${TARGETS[@]}"; do
+  repo_header "$repo"
+
+  if is_archived "$repo"; then
+    skipped "archived repository"
+    continue
   fi
-  # Note: The success message is now technically inaccurate since bypass is applied via role, not specific ID.
-  echo "  -> SUCCESS: Repository Admins (which includes you) can bypass merge rules."
-  echo "  -> Repo Settings: https://github.com/$REPO/settings/rules"
-  echo
+
+  # Only consider rulesets owned by this repository (not org-level ones).
+  existing="$(
+    gh api "repos/$repo/rulesets?includes_parents=false" \
+      --jq "map(select(.name == \"$RULESET_NAME\")) | .[0].id // empty" 2>/dev/null || true
+  )"
+
+  if [[ -n "$existing" ]]; then
+    step "ruleset '$RULESET_NAME' updated (id $existing)" \
+      gh api "repos/$repo/rulesets/$existing" --method PUT --input "$payload"
+  else
+    step "ruleset '$RULESET_NAME' created" \
+      gh api "repos/$repo/rulesets" --method POST --input "$payload"
+  fi
+
+  log "  -> https://github.com/$repo/settings/rules"
 done
-rm -f /tmp/ruleset.json
-echo "=================================================="
-echo "Mission accomplished!"
+
+finish

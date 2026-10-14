@@ -1,65 +1,44 @@
 #!/usr/bin/env bash
-# 6-gh-enable-private-vuln-reporting.sh
-# Summary: Enable GitHub Advanced Security Private Vulnerability Reporting
-# for one or more repositories using the GitHub CLI (`gh`).
+# 06-gh-enable-private-vuln-reporting.sh
+# Summary: Enable private vulnerability reporting for one or more repositories
+# using the GitHub CLI (`gh`).
+#
+# With this on, people can report vulnerabilities privately through the
+# repository's Security tab instead of opening a public issue.
 #
 # Prerequisites:
-#  - `gh` (GitHub CLI) installed and authenticated: `gh auth login`
-#  - Admin access to target repositories and GH Advanced Security available
+#  - `gh` installed and authenticated: `gh auth login`
+#  - Admin access to the target repositories
 #
 # Usage:
-#  REPOS="repo1,repo2" OWNER="username" bash 6-gh-enable-private-vuln-reporting.sh
-#  If empty, public repos for OWNER are fetched.
+#  REPOS="repo1,repo2" OWNER="username" bash 06-gh-enable-private-vuln-reporting.sh
+#  DRY_RUN=1 bash 06-gh-enable-private-vuln-reporting.sh
+#  Default target: all public repos of OWNER.
 
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
-OWNER=${OWNER:-"username"}
-REPOS=${REPOS:-""}
-REPOS_TO_PROCESS=()
+init_targets
+log "Enabling private vulnerability reporting for ${#TARGETS[@]} repositories..."
 
-echo "Preparing to enable private vulnerability reporting for $OWNER..."
+for repo in "${TARGETS[@]}"; do
+  repo_header "$repo"
 
-if [ -z "${REPOS}" ]; then
-  echo "  (fetching public repositories for $OWNER)"
-  REPOS=$(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public | paste -sd, -)
-  if [ -z "${REPOS}" ]; then
-    echo "ERROR: No public repositories found for $OWNER."
-    exit 1
-  fi
-fi
-
-# Split comma-separated string into array and trim whitespace
-IFS=',' read -r -a REPOS_ARRAY <<< "$REPOS"
-for r in "${REPOS_ARRAY[@]}"; do
-  r="${r// /}"
-  REPOS_TO_PROCESS+=("$r")
-done
-
-count=0
-for repo_name in "${REPOS_TO_PROCESS[@]}"; do
-  if [[ "$repo_name" == *"/"* ]]; then
-    repo="$repo_name"
-  else
-    repo="$OWNER/$repo_name"
-  fi
-  echo "=========================================="
-  echo "Processing $repo"
-
-  # Skip archived repositories
-  archived=$(gh api "repos/$repo" --jq '.archived' 2>/dev/null || echo "false")
-  if [ "$archived" = "true" ]; then
-    echo "  -> Skipping archived repository"
+  if is_archived "$repo"; then
+    skipped "archived repository"
     continue
   fi
 
-  # Enable private vulnerability reporting via API
-  if gh api "repos/$repo/private-vulnerability-reporting" --method PUT -f enabled=true >/dev/null 2>&1; then
-    echo "  -> Private vulnerability reporting enabled for $repo"
-    count=$((count+1))
-  else
-    echo "  -> ERROR: Failed to enable private vulnerability reporting for $repo"
+  state="$(gh api "repos/$repo/private-vulnerability-reporting" --jq '.enabled' 2>/dev/null || echo unknown)"
+  if [[ "$state" == "true" ]]; then
+    already "private vulnerability reporting"
+    continue
   fi
+  log "  current state: $state"
+
+  step "private vulnerability reporting enabled" \
+    gh api "repos/$repo/private-vulnerability-reporting" --method PUT -f enabled=true
 done
 
-echo "=========================================="
-echo "Done. Enabled private vulnerability reporting for $count repositories."
+finish

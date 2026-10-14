@@ -1,66 +1,45 @@
 #!/usr/bin/env bash
 # 10-gh-enable-dependabot-security-updates.sh
-# Summary: Enable Dependabot security updates (automated security fixes) for one or more repositories
-# using the GitHub CLI (`gh`).
+# Summary: Enable Dependabot security updates (automated upgrade PRs) for one
+# or more repositories using the GitHub CLI (`gh`).
+#
+# This is a different toggle from Dependabot alerts: alerts only notify you
+# about vulnerable dependencies, security updates actually open the PRs that
+# bump them.
 #
 # Prerequisites:
 #  - `gh` installed and authenticated: `gh auth login`
 #  - Admin access to the target repositories
-#  - GitHub Advanced Security available for the repository (if applicable)
 #
 # Usage:
 #  REPOS="repo1,repo2" OWNER="username" bash 10-gh-enable-dependabot-security-updates.sh
-#  If REPOS is empty, public repos for OWNER are fetched.
+#  DRY_RUN=1 bash 10-gh-enable-dependabot-security-updates.sh
+#  Default target: all public repos of OWNER.
 
-set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$SCRIPT_DIR/lib/common.sh"
 
-OWNER=${OWNER:-"username"}
-REPOS=${REPOS:-""}
-REPOS_TO_PROCESS=()
+init_targets
+log "Enabling Dependabot security updates for ${#TARGETS[@]} repositories..."
 
-echo "Preparing to enable Dependabot security updates for $OWNER..."
+for repo in "${TARGETS[@]}"; do
+  repo_header "$repo"
 
-if [ -z "${REPOS}" ]; then
-  echo "  (fetching public repositories for $OWNER)"
-  REPOS=$(gh repo list "$OWNER" --limit 1000 --json nameWithOwner -q '.[].nameWithOwner' --visibility public | paste -sd, -)
-  if [ -z "${REPOS}" ]; then
-    echo "ERROR: No public repositories found for $OWNER."
-    exit 1
-  fi
-fi
-
-# Parse comma-separated REPOS and normalize
-IFS=',' read -r -a REPOS_ARRAY <<< "$REPOS"
-for r in "${REPOS_ARRAY[@]}"; do
-  r="${r// /}"
-  if [[ "$r" == *"/"* ]]; then
-    REPOS_TO_PROCESS+=("$r")
-  else
-    REPOS_TO_PROCESS+=("$OWNER/$r")
-  fi
-done
-
-count=0
-for repo in "${REPOS_TO_PROCESS[@]}"; do
-  echo "=========================================="
-  echo "Processing $repo"
-
-  # Skip archived repositories
-  archived=$(gh api "repos/$repo" --jq '.archived' 2>/dev/null || echo "false")
-  if [ "$archived" = "true" ]; then
-    echo "  -> Skipping archived repository"
+  if is_archived "$repo"; then
+    skipped "archived repository"
     continue
   fi
 
-  # Enable Dependabot security updates (automated security fixes) via API
-  # The endpoint returns 204 on success
-  if gh api "repos/$repo/automated-security-fixes" --method PUT >/dev/null 2>&1; then
-    echo "  -> Dependabot security updates enabled for $repo"
-    count=$((count+1))
-  else
-    echo "  -> ERROR: Failed to enable Dependabot security updates for $repo"
+  state="$(gh api "repos/$repo/automated-security-fixes" --jq '.enabled // false' 2>/dev/null || echo false)"
+  if [[ "$state" == "true" ]]; then
+    already "Dependabot security updates"
+    continue
   fi
+  log "  current state: enabled=$state"
+
+  step "Dependabot security updates enabled" \
+    gh api "repos/$repo/automated-security-fixes" --method PUT
 done
 
-echo "=========================================="
-echo "Done. Enabled Dependabot security updates for $count repositories."
+finish
