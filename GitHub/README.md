@@ -59,6 +59,8 @@ failed (or, for the audit, when a check found a gap).
 | `09-gh-enable-dependabot-alerts.sh` | Enable Dependabot alerts |
 | `10-gh-enable-dependabot-security-updates.sh` | Enable Dependabot auto-fix PRs (a different toggle from alerts) |
 | `11-gh-enable-dependabot-malware-alerts.sh` | Malware alert coverage - same toggle as `07`/`09`, kept as a labelled step |
+| `12-gh-enable-codeql.sh` | Enable CodeQL default setup (counterpart of `destructive/24`) |
+| `13-gh-add-security-md.sh` | Commit a `SECURITY.md` when the repository has none (never overwrites) |
 | `99-gh-audit-security.sh` | **Read-only** compliance report, exits non-zero on gaps |
 | `destructive/20-gh-delete-rulesets.sh` | Deletes all rulesets (destructive) |
 | `destructive/24-gh-disable-codeql.sh` | Disables CodeQL default setup (destructive) |
@@ -79,7 +81,9 @@ retry-on-rate-limit, dry-run, counters, exit codes). Every script sources it.
 8. `10` - Dependabot security updates
 9. `03` - branch protection ruleset
 10. `05` - Copilot code review ruleset (needs `03`'s world in place)
-11. `99` - audit everything
+11. `12` - CodeQL default setup
+12. `13` - `SECURITY.md` for repositories that do not have one
+13. `99` - audit everything
 
 `00-run-all.sh` runs exactly this order (numerically, then the audit).
 
@@ -124,7 +128,7 @@ One row per repository:
 | `UPDATES` | Dependabot security updates |
 | `RULESET` | the `03` ruleset exists on the repository |
 | `SECMD` | `SECURITY.md` exists in the repository root |
-| `CODEQL` | code scanning, best effort - `?` means "the API cannot tell" |
+| `CODEQL` | CodeQL default setup is `configured` |
 
 ```bash
 OWNER="my-org" bash 99-gh-audit-security.sh          # table + exit 1 on gaps
@@ -141,8 +145,8 @@ is reported as `GAPS FOUND`, not as a broken script.
   single toggle covers the dependency graph, Dependabot alerts and malware
   alert coverage. Only the first one actually writes, the others report `already`.
 - `04` refuses to run (and says why) when secret scanning is not enabled.
-- `SECURITY.md` is reported as a gap by the audit but is **not** created by
-  any script - add one manually if you want that check green.
+- `13` creates `SECURITY.md` when it is missing (one commit per repository)
+  and never overwrites an existing policy.
 - `08` snapshots only the repository root manifests and only pinned (`==`)
   dependencies. For continuous coverage, prefer the official dependency
   submission action in GitHub Actions.

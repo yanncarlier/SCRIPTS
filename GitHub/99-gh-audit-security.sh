@@ -157,14 +157,15 @@ for repo in "${TARGETS[@]}"; do
     "$c_alerts:Dependabot alerts" \
     "$c_updates:Dependabot security updates" \
     "$c_ruleset:ruleset '$RULESET_NAME'" \
-    "$c_secmd:SECURITY.md"; do
+    "$c_secmd:SECURITY.md" \
+    "$c_codeql:CodeQL default setup"; do
     if [[ "${pair%%:*}" == "N" ]]; then
       problems+=("${pair#*:}")
     fi
   done
 
   unknown=0
-  for v in "$c_secret" "$c_push" "$c_pvr" "$c_alerts" "$c_updates" "$c_ruleset" "$c_secmd"; do
+  for v in "$c_secret" "$c_push" "$c_pvr" "$c_alerts" "$c_updates" "$c_ruleset" "$c_secmd" "$c_codeql"; do
     if [[ "$v" == "?" ]]; then
       unknown=$((unknown + 1))
     fi

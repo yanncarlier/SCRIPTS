@@ -34,10 +34,12 @@ declare -A SCRIPTS=(
   [09]="09-gh-enable-dependabot-alerts.sh"
   [10]="10-gh-enable-dependabot-security-updates.sh"
   [11]="11-gh-enable-dependabot-malware-alerts.sh"
+  [12]="12-gh-enable-codeql.sh"
+  [13]="13-gh-add-security-md.sh"
   [99]="99-gh-audit-security.sh"
 )
 
-ORDER=(01 02 03 04 05 06 07 08 09 10 11)
+ORDER=(01 02 03 04 05 06 07 08 09 10 11 12 13)
 
 # === SELECT STEPS ========================================================
 
